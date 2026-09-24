@@ -192,3 +192,35 @@ malformadas.
 Esses controles complementam o firewall: enquanto L3/L4 controlam
 endereços, protocolos e portas, o controle L7 permite analisar o
 conteúdo e o contexto da comunicação.
+
+## Respostas às questões de investigação
+
+### Quem pode se comunicar com quem?
+
+A LAN pode iniciar conexões para a Internet e para os serviços
+autorizados da DMZ. A Internet pode acessar somente os serviços Web
+publicados. A DMZ não pode iniciar novas conexões para a LAN. A rede
+MGMT pode acessar as redes conforme a política administrativa.
+
+### Que tipos de comunicação são permitidos ou bloqueados?
+
+São permitidas as comunicações explicitamente previstas na política,
+como HTTP/HTTPS para o servidor Web, DNS para o servidor DNS e tráfego
+de saída da LAN para a Internet. O firewall utiliza estado de conexão
+para permitir respostas de conexões autorizadas.
+
+São bloqueadas novas conexões da Internet para a LAN, novas conexões
+da DMZ para a LAN e qualquer tráfego que não esteja explicitamente
+autorizado pela política de default deny. Os experimentos L2, L3 e L4
+adicionam bloqueios específicos por MAC, protocolo/endereço IP e portas.
+
+### Se uma camada de segurança falhar, quais outras ainda protegem a infraestrutura?
+
+A topologia utiliza Defense in Depth. Mesmo que um controle específico
+falhe, a segmentação entre LAN, DMZ e MGMT, o firewall com filtragem
+stateful, as restrições por serviço e os controles específicos de L2,
+L3 e L4 continuam criando barreiras independentes.
+
+Por exemplo, o comprometimento do servidor Web na DMZ não fornece
+automaticamente acesso à LAN, porque novas conexões DMZ → LAN são
+bloqueadas pelo firewall.
