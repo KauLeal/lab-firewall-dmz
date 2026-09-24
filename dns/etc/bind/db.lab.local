@@ -1,0 +1,18 @@
+$TTL    60
+@       IN      SOA     dns.lab.local. admin.lab.local. (
+                              3         ; Serial
+                             60         ; Refresh
+                             60         ; Retry
+                          86400         ; Expire
+                             60 )       ; Negative Cache TTL
+;
+@       IN      NS      dns.lab.local.
+
+dns     IN      A       10.0.2.11
+web     IN      A       10.0.2.10
+www     IN      CNAME   web.lab.local.
+intranet IN     A       10.0.2.10
+fw      IN      A       10.0.1.1
+pc1     IN      A       10.0.1.10
+pc2     IN      A       10.0.1.11
+adm     IN      A       10.0.3.10

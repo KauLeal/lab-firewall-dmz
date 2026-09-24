@@ -1,0 +1,14 @@
+options {
+    directory "/var/cache/bind";
+
+    // Atende a LAN, a DMZ e a rede de gerencia
+    listen-on { any; };
+    listen-on-v6 { none; };
+
+    allow-query { any; };
+    recursion yes;
+    allow-recursion { 10.0.0.0/16; localhost; };
+
+    dnssec-validation no;
+    auth-nxdomain no;
+};

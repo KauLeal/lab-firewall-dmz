@@ -1,0 +1,28 @@
+#!/bin/bash
+# =============================================================
+# internet - representa a "nuvem" da figura.
+#   203.0.113.1   -> site externo permitido        (ok.ext.lab)
+#   203.0.113.66  -> destino proibido pela empresa (bad.ext.lab)
+#   203.0.113.67  -> MESMO site, segundo IP        (bad.ext.lab / cdn.ext.lab)
+#                    usado para mostrar a fragilidade do bloqueio por IP
+#   203.0.113.10  -> "peer" P2P (BitTorrent) para o experimento de L4
+# =============================================================
+ip address add 203.0.113.1/24  dev eth0
+ip address add 203.0.113.66/24 dev eth0
+ip address add 203.0.113.67/24 dev eth0
+ip address add 203.0.113.10/24 dev eth0
+ip link set dev eth0 up
+
+# Rota para a rede da empresa (artificio de laboratorio: permite testar
+# "Internet -> LAN" sem passar por NAT, para evidenciar o bloqueio no fw)
+ip route add 10.0.0.0/16 via 203.0.113.254
+
+chmod +x /root/bin/*.sh 2>/dev/null
+
+# Servidores web externos (site permitido e site proibido)
+/root/bin/start-web.sh
+
+# "Peers" P2P simulados: BitTorrent TCP 6881/51413 e tracker UDP 6969
+/root/bin/listen.sh tcp 6881  > /var/log/p2p-tcp6881.log  2>&1 &
+/root/bin/listen.sh tcp 51413 > /var/log/p2p-tcp51413.log 2>&1 &
+/root/bin/listen.sh udp 6969  > /var/log/p2p-udp6969.log  2>&1 &

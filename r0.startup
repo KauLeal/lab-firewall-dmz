@@ -1,0 +1,29 @@
+#!/bin/bash
+# =============================================================
+# r0 - Roteador de borda / NAT
+#   eth0 -> Internet  203.0.113.254/24
+#   eth1 -> WAN (link com o fw) 198.51.100.1/30
+# =============================================================
+ip address add 203.0.113.254/24 dev eth0
+ip link set dev eth0 up
+
+ip address add 198.51.100.1/30 dev eth1
+ip link set dev eth1 up
+
+sysctl -w net.ipv4.ip_forward=1
+
+# Default para a "Internet"
+ip route add default via 203.0.113.1
+
+# Redes internas da organizacao ficam atras do firewall
+ip route add 10.0.0.0/16 via 198.51.100.2
+
+# ---- NAT de saida (LAN/DMZ -> Internet) ------------------------------------
+iptables -t nat -A POSTROUTING -o eth0 -s 10.0.0.0/16 -j MASQUERADE
+
+# ---- Publicacao do servidor Web da DMZ (DNAT / port forwarding) ------------
+# Internet -> 203.0.113.254:80|443  ==>  10.0.2.10:80|443 (web na DMZ)
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 80  -j DNAT --to-destination 10.0.2.10:80
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 443 -j DNAT --to-destination 10.0.2.10:443
+
+chmod +x /root/bin/*.sh 2>/dev/null

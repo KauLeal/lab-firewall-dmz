@@ -1,0 +1,40 @@
+#!/bin/bash
+# =============================================================
+# fw - Firewall / Middlebox
+#   eth0 -> WAN  198.51.100.2/30  (link com r0)
+#   eth1 -> LAN  10.0.1.1/24
+#   eth2 -> DMZ  10.0.2.1/24
+#   eth3 -> MGMT 10.0.3.1/24
+# Na Etapa 1 o firewall fica PERMISSIVO (baseline).
+# A politica restritiva e aplicada depois com /root/rules/10-perimetro.sh
+# =============================================================
+ip address add 198.51.100.2/30 dev eth0
+ip link set dev eth0 up
+
+ip address add 10.0.1.1/24 dev eth1
+ip link set dev eth1 up
+
+ip address add 10.0.2.1/24 dev eth2
+ip link set dev eth2 up
+
+ip address add 10.0.3.1/24 dev eth3
+ip link set dev eth3 up
+
+sysctl -w net.ipv4.ip_forward=1
+sysctl -w net.ipv4.conf.all.rp_filter=0
+sysctl -w net.ipv4.conf.default.rp_filter=0
+
+# Tudo o que nao for 10.0.0.0/16 sai pelo roteador de borda
+ip route add default via 198.51.100.1
+
+echo "nameserver 10.0.2.11" > /etc/resolv.conf
+echo "fw" > /etc/hostname; hostname fw
+
+chmod +x /root/rules/*.sh /root/bin/*.sh 2>/dev/null
+
+# Coletor dos pacotes negados: as regras logam via NFLOG (grupo 1) e este
+# tcpdump grava tudo em /var/log/fw-drops.log (lido por /root/bin/logs.sh).
+nohup tcpdump -i nflog:1 -n -e -l --immediate-mode >> /var/log/fw-drops.log 2>/dev/null &
+
+# ETAPA 1 (baseline): firewall encaminhando sem restricoes
+/root/rules/00-baseline-permissivo.sh

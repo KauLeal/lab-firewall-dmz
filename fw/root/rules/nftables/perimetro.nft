@@ -1,0 +1,88 @@
+#!/usr/sbin/nft -f
+# =============================================================================
+# EQUIVALENTE EM NFTABLES da politica de perimetro (10-perimetro.sh)
+# Aplicar com:  nft -f /root/rules/nftables/perimetro.nft
+# (Use OU iptables OU nftables - nao os dois ao mesmo tempo.)
+# =============================================================================
+flush ruleset
+
+define WAN  = eth0
+define LAN  = eth1
+define DMZ  = eth2
+define MGMT = eth3
+
+define LAN_NET  = 10.0.1.0/24
+define DMZ_NET  = 10.0.2.0/24
+define MGMT_NET = 10.0.3.0/24
+define WEB      = 10.0.2.10
+define DNS      = 10.0.2.11
+
+table inet firewall {
+
+    # ---- Chains dos experimentos por camada (vazias por padrao) ------------
+    chain lab_l2 { }
+    chain lab_l3 { }
+    chain lab_l4 { }
+
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        jump lab_l2
+        iif "lo" accept
+        ct state invalid drop
+        ct state established,related accept          comment "respostas permitidas"
+
+        iifname $MGMT ip saddr $MGMT_NET accept      comment "gerencia do firewall"
+        iifname $LAN  icmp type echo-request accept  comment "ping ao gateway (LAN)"
+        iifname $DMZ  icmp type echo-request accept  comment "ping ao gateway (DMZ)"
+
+        log prefix "[FW] DROP input "
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        jump lab_l2
+        jump lab_l3
+        jump lab_l4
+
+        ct state invalid drop
+        ct state established,related accept          comment "respostas permitidas"
+
+        # LAN -> Internet
+        iifname $LAN oifname $WAN ip saddr $LAN_NET ct state new accept
+
+        # LAN -> servicos da DMZ
+        iifname $LAN oifname $DMZ ip saddr $LAN_NET ip daddr $WEB tcp dport { 80, 443 } ct state new accept
+        iifname $LAN oifname $DMZ ip saddr $LAN_NET ip daddr $DNS udp dport 53 ct state new accept
+        iifname $LAN oifname $DMZ ip saddr $LAN_NET ip daddr $DNS tcp dport 53 ct state new accept
+        iifname $LAN oifname $DMZ ip saddr $LAN_NET icmp type echo-request accept
+
+        # Internet -> Web publicado na DMZ
+        iifname $WAN oifname $DMZ ip daddr $WEB tcp dport { 80, 443 } ct state new accept
+
+        # DMZ -> Internet (somente a resolucao DNS de que o servico precisa)
+        iifname $DMZ oifname $WAN ip saddr $DNS udp dport 53 accept
+        iifname $DMZ oifname $WAN ip saddr $DNS tcp dport 53 accept
+
+        # Gerencia
+        iifname $MGMT ip saddr $MGMT_NET accept
+
+        # Bloqueios explicitos com log
+        iifname $WAN oifname $LAN log prefix "[FW] DROP WAN->LAN " drop
+        iifname $DMZ oifname $LAN ct state new log prefix "[FW] DROP DMZ->LAN " drop
+
+        log prefix "[FW] DROP default "
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+
+# ---- Exemplos de regras dos experimentos (adicionar quando for testar) -----
+# L2: nft add rule inet firewall lab_l2 iifname "eth1" ether saddr 00:00:00:00:01:11 drop
+# L3: nft add rule inet firewall lab_l3 ip saddr 10.0.1.0/24 ip daddr 10.0.2.0/24 meta l4proto icmp drop
+# L3: nft add rule inet firewall lab_l3 ip saddr 10.0.1.0/24 ip daddr 203.0.113.66 reject with icmpx admin-prohibited
+# L4: nft add rule inet firewall lab_l4 tcp dport { 6881-6889, 51413 } drop
+# L4: nft add rule inet firewall lab_l4 udp dport { 6881-6889, 6969, 51413 } drop

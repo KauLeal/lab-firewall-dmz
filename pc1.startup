@@ -1,0 +1,11 @@
+#!/bin/bash
+# pc1 - estacao da LAN
+ip link set dev eth0 down
+ip link set dev eth0 address 00:00:00:00:01:10
+ip link set dev eth0 up
+ip address add 10.0.1.10/24 dev eth0
+ip route add default via 10.0.1.1
+
+echo "nameserver 10.0.2.11" > /etc/resolv.conf
+echo "pc1" > /etc/hostname; hostname pc1
+chmod +x /root/bin/*.sh 2>/dev/null

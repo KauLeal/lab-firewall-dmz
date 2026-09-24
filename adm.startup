@@ -1,0 +1,8 @@
+#!/bin/bash
+# adm - estacao de gerencia (rede MGMT, opcional na figura)
+ip address add 10.0.3.10/24 dev eth0
+ip link set dev eth0 up
+ip route add default via 10.0.3.1
+echo "nameserver 10.0.2.11" > /etc/resolv.conf
+echo "adm" > /etc/hostname; hostname adm
+chmod +x /root/bin/*.sh 2>/dev/null

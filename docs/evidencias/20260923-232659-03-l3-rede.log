@@ -1,0 +1,58 @@
+
+=== L3-A.1 ANTES - ICMP entre LAN e DMZ funciona ===
+  [PERMITIDO] pc1 -> web da DMZ (ping)
+
+=== L3-A.2 OBSERVAR - echo request/reply no fw (interface da DMZ) ===
+
+
+      02:28:52.497131 IP 10.0.1.10 > 10.0.2.10: ICMP echo request, id 9908, seq 1, length 64
+      02:28:52.497514 IP 10.0.2.10 > 10.0.1.10: ICMP echo reply, id 9908, seq 1, length 64
+      02:28:53.529658 IP 10.0.1.10 > 10.0.2.10: ICMP echo request, id 9908, seq 2, length 64
+      02:28:53.529948 IP 10.0.2.10 > 10.0.1.10: ICMP echo reply, id 9908, seq 2, length 64
+
+=== L3-A.3 APLICAR a regra de bloqueio de ICMP ===
+      [fw] L3-A ON  -> ICMP entre LAN (10.0.1.0/24) e DMZ (10.0.2.0/24) bloqueado.
+           HTTP/DNS para a DMZ continuam funcionando (o bloqueio e so do protocolo ICMP).
+      Chain LAB_L3_ICMP (1 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 NFLOG      1    --  *      *       10.0.1.0/24          10.0.2.0/24          nflog-prefix "[FW] DROP ICMP LAN->DMZ " nflog-group 1
+      2        0     0 DROP       1    --  *      *       10.0.1.0/24          10.0.2.0/24          /* L3-A: ICMP LAN->DMZ bloqueado */
+      3        0     0 DROP       1    --  *      *       10.0.2.0/24          10.0.1.0/24          /* L3-A: ICMP DMZ->LAN bloqueado */
+
+=== L3-A.4 DEPOIS ===
+  [BLOQUEADO] pc1 -> web da DMZ (ping)
+  [PERMITIDO] pc1 -> web da DMZ (HTTP continua!)
+  [PERMITIDO] pc1 -> Internet (ping nao afetado)
+     tcpdump em fw:eth2 durante o ping bloqueado (nada deve sair para a DMZ):
+
+
+      
+     (o pacote e descartado na entrada do fw: nao chega a ser encaminhado a DMZ)
+
+=== L3-B.1 ANTES - a LAN acessa o destino proibido ===
+  [PERMITIDO] pc1 -> http://203.0.113.66/ (bad.ext.lab)
+     O dominio bad.ext.lab resolve para:
+      203.0.113.67
+      203.0.113.66
+
+=== L3-B.2 APLICAR o bloqueio do destino ===
+      [fw] L3-B ON  -> LAN bloqueada para 203.0.113.66.
+           Teste tambem 203.0.113.67 (mesmo site, outro IP): continua acessivel!
+      Chain LAB_L3_DST (1 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 NFLOG      0    --  *      *       10.0.1.0/24          203.0.113.66         nflog-prefix "[FW] DROP destino proibido " nflog-group 1
+      2        0     0 REJECT     0    --  *      *       10.0.1.0/24          203.0.113.66         /* L3-B: destino proibido pela politica */ reject-with icmp-admin-prohibited
+
+=== L3-B.3 DEPOIS ===
+  [BLOQUEADO] pc1 -> 203.0.113.66 (IP bloqueado)
+  [PERMITIDO] pc1 -> 203.0.113.1 (outro destino)
+
+=== L3-B.4 A LIMITACAO DO CONTROLE POR IP ===
+  [PERMITIDO] MESMO site continua acessivel por 203.0.113.67
+     O dominio tem 2 registros A; bloqueamos so um deles.
+     Em um CDN real seriam dezenas de IPs, mudando o tempo todo -
+     e um mesmo IP pode hospedar centenas de sites legitimos (bloqueio excessivo).
+
+-----------------------------------------------
+ Resultado: 8 conforme o esperado, 0 divergente(s)
+-----------------------------------------------

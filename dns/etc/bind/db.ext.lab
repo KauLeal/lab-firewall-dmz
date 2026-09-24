@@ -1,0 +1,21 @@
+$TTL    60
+@       IN      SOA     dns.lab.local. admin.lab.local. (
+                              3 ; Serial
+                             60 ; Refresh
+                             60 ; Retry
+                          86400 ; Expire
+                             60 ) ; Negative Cache TTL
+;
+@       IN      NS      dns.lab.local.
+
+; Site externo permitido
+ok      IN      A       203.0.113.1
+
+; Destino proibido: DOIS registros A para o MESMO nome.
+; Bloquear apenas um dos IPs no firewall NAO impede o acesso ao site.
+bad     IN      A       203.0.113.66
+bad     IN      A       203.0.113.67
+cdn     IN      A       203.0.113.67
+
+; "Peer" P2P
+p2p     IN      A       203.0.113.10

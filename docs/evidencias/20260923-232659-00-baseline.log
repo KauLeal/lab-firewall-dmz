@@ -1,0 +1,42 @@
+Aplicando baseline permissiva no fw...
+[fw] BASELINE aplicado: politica ACCEPT, nenhuma restricao.
+
+=== 1.1 Enderecamento e roteamento ===
+  [PERMITIDO] pc1 alcanca o gateway (fw eth1 10.0.1.1)
+  [PERMITIDO] fw alcanca o roteador de borda (198.51.100.1)
+  [PERMITIDO] r0 alcanca a Internet (203.0.113.1)
+
+=== 1.2 LAN -> Internet (NAT via r0) ===
+  [PERMITIDO] pc1 -> Internet (ICMP)
+  [PERMITIDO] pc2 -> Internet (ICMP)
+  [PERMITIDO] pc1 -> site externo (HTTP)
+     NAT aplicado em r0:
+      Chain POSTROUTING (policy ACCEPT 0 packets, 0 bytes)
+       pkts bytes target     prot opt in     out     source               destination         
+          0     0 DOCKER_POSTROUTING  0    --  *      *       0.0.0.0/0            127.0.0.11          
+          9   732 MASQUERADE  0    --  *      eth0    10.0.0.0/16          0.0.0.0/0           
+
+=== 1.3 LAN -> DMZ ===
+  [PERMITIDO] pc1 -> web da DMZ (ICMP)
+  [PERMITIDO] pc1 -> web da DMZ (HTTP)
+  [PERMITIDO] pc1 -> /admin do web
+  [PERMITIDO] pc2 -> web da DMZ (HTTP)
+
+=== 1.4 Servicos da DMZ (web e dns) ===
+  [PERMITIDO] DNS resolve web.lab.local
+  [PERMITIDO] DNS resolve bad.ext.lab
+  [PERMITIDO] HTTP por nome (web.lab.local)
+  [PERMITIDO] HTTPS no web da DMZ
+
+=== 1.5 Internet -> Web publicado (DNAT em r0) ===
+  [PERMITIDO] internet -> 203.0.113.254:80 chega ao web da DMZ
+
+=== 1.6 O firewall esta encaminhando (baseline: sem restricoes) ===
+     Politica atual do fw:
+      -P INPUT ACCEPT
+      -P FORWARD ACCEPT
+      -P OUTPUT ACCEPT
+
+-----------------------------------------------
+ Resultado: 15 conforme o esperado, 0 divergente(s)
+-----------------------------------------------

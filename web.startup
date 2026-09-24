@@ -1,0 +1,17 @@
+#!/bin/bash
+# web - Servidor Web da DMZ (HTTP/HTTPS)
+ip address add 10.0.2.10/24 dev eth0
+ip link set dev eth0 up
+ip route add default via 10.0.2.1
+echo "nameserver 10.0.2.11" > /etc/resolv.conf
+echo "web" > /etc/hostname; hostname web
+
+# TLS auto-assinado para o servico HTTPS (util na discussao de SNI / L7)
+if [ ! -f /etc/ssl/private/web.key ]; then
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+     -keyout /etc/ssl/private/web.key -out /etc/ssl/certs/web.crt \
+     -subj "/C=BR/O=Lab/CN=web.lab.local" >/dev/null 2>&1
+fi
+
+a2enmod ssl >/dev/null 2>&1
+( service apache2 start || /etc/init.d/apache2 start || apachectl start ) >/dev/null 2>&1

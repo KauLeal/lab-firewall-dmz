@@ -1,0 +1,52 @@
+
+=== 4.1 Reconhecimento da LAN a partir do servidor comprometido ===
+  [BLOQUEADO] web -> pc1 (ICMP)
+  [BLOQUEADO] web -> pc2 (ICMP)
+  [BLOQUEADO] web -> pc1:80 (TCP)
+  [BLOQUEADO] web -> pc1:22 (SSH)
+  [BLOQUEADO] web -> pc1:445 (SMB)
+  [BLOQUEADO] web -> pc1:3389 (RDP)
+  [BLOQUEADO] web -> rede de gerencia (adm)
+
+=== 4.2 Saida para a Internet (download de ferramentas / canal de C2) ===
+  [BLOQUEADO] web -> HTTP externo
+  [BLOQUEADO] web -> HTTPS externo
+  [BLOQUEADO] web -> porta alta arbitraria (C2)
+
+=== 4.3 O que AINDA funciona (e por que) ===
+  [PERMITIDO] LAN -> web: o servico continua sendo entregue
+     A LAN acessa o servidor; o servidor nao acessa a LAN. Essa assimetria
+     vem do conntrack: apenas quem INICIOU a conexao recebe as respostas.
+  [PERMITIDO] web -> dns da DMZ (mesma rede, nao passa pelo firewall)
+     Dentro da DMZ nao ha filtragem: o firewall so ve o que ATRAVESSA redes.
+     Por isso o dns tambem precisa de proteccao propria (hardening, patches).
+
+=== 4.4 Evidencia: as tentativas ficaram registradas ===
+      === ultimos 12 pacotes negados pelo firewall ===
+      02:30:19.830349 version 0, resource ID 1, family IPv4 (2), length 212: 10.0.2.10 > 10.0.3.10: ICMP echo request, id 30480, seq 1, length 64
+      02:30:20.854376 version 0, resource ID 1, family IPv4 (2), length 212: 10.0.2.10 > 10.0.3.10: ICMP echo request, id 30480, seq 2, length 64
+      02:30:23.638363 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.41998 > 203.0.113.1.80: Flags [S], seq 1597809482, win 64240, options [mss 1460,sackOK,TS val 2564401746 ecr 0,nop,wscale 10], length 0
+      02:30:24.662397 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.41998 > 203.0.113.1.80: Flags [S], seq 1597809482, win 64240, options [mss 1460,sackOK,TS val 2564402752 ecr 0,nop,wscale 10], length 0
+      02:30:25.686686 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.41998 > 203.0.113.1.80: Flags [S], seq 1597809482, win 64240, options [mss 1460,sackOK,TS val 2564403776 ecr 0,nop,wscale 10], length 0
+      02:30:26.710408 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.41998 > 203.0.113.1.80: Flags [S], seq 1597809482, win 64240, options [mss 1460,sackOK,TS val 2564404800 ecr 0,nop,wscale 10], length 0
+      02:30:28.438439 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.59754 > 203.0.113.1.443: Flags [S], seq 2363420842, win 64240, options [mss 1460,sackOK,TS val 985566105 ecr 0,nop,wscale 10], length 0
+      02:30:29.462362 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.59754 > 203.0.113.1.443: Flags [S], seq 2363420842, win 64240, options [mss 1460,sackOK,TS val 985567113 ecr 0,nop,wscale 10], length 0
+      02:30:30.486583 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.59754 > 203.0.113.1.443: Flags [S], seq 2363420842, win 64240, options [mss 1460,sackOK,TS val 985568137 ecr 0,nop,wscale 10], length 0
+      02:30:32.246423 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.49590 > 203.0.113.1.4444: Flags [S], seq 3533500523, win 64240, options [mss 1460,sackOK,TS val 2488603719 ecr 0,nop,wscale 10], length 0
+      02:30:33.270384 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.49590 > 203.0.113.1.4444: Flags [S], seq 3533500523, win 64240, options [mss 1460,sackOK,TS val 2488604738 ecr 0,nop,wscale 10], length 0
+      02:30:34.294370 version 0, resource ID 1, family IPv4 (2), length 188: 10.0.2.10.49590 > 203.0.113.1.4444: Flags [S], seq 3533500523, win 64240, options [mss 1460,sackOK,TS val 2488605762 ecr 0,nop,wscale 10], length 0
+      
+      === qual regra negou: contadores das regras de bloqueio ===
+      Chain INPUT (policy DROP 0 packets, 0 bytes)
+      Chain FORWARD (policy DROP 12 packets, 768 bytes)
+      17      16  1056 NFLOG      0    --  eth2   eth1    0.0.0.0/0            0.0.0.0/0            ctstate NEW nflog-prefix "[FW] DROP DMZ->LAN " nflog-group 1
+      18      16  1056 DROP       0    --  eth2   eth1    0.0.0.0/0            0.0.0.0/0            ctstate NEW /* DMZ -> LAN (novas conexoes) BLOQUEADO */
+      19      12   768 NFLOG      0    --  *      *       0.0.0.0/0            0.0.0.0/0            nflog-prefix "[FW] DROP default " nflog-group 1
+      Chain OUTPUT (policy ACCEPT 0 packets, 0 bytes)
+      Chain LAB_L2 (2 references)
+      Chain LAB_L3 (1 references)
+      Chain LAB_L4 (1 references)
+
+-----------------------------------------------
+ Resultado: 12 conforme o esperado, 0 divergente(s)
+-----------------------------------------------

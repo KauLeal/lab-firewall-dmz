@@ -1,0 +1,7 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8">
+<title>/admin</title><h1>/admin</h1>
+<p>Area administrativa: deveria ser acessivel <strong>somente</strong> a partir
+   da LAN ou da rede de gerencia.</p>
+<p>Um firewall de camada 3/4 nao consegue diferenciar esta URL de /public -
+   para ele, ambas sao apenas "TCP 80 -> 10.0.2.10". Diferenciar exige
+   inspecao de camada 7 (proxy reverso, WAF ou NGFW).</p>

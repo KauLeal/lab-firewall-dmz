@@ -1,0 +1,39 @@
+
+=== L4.1 ANTES - a LAN alcanca o 'peer' BitTorrent ===
+  [PERMITIDO] pc1 -> TCP 6881 em 203.0.113.10
+  [PERMITIDO] pc1 -> UDP 6969 (tracker)
+
+=== L4.2 OBSERVAR - o trafego saindo pela WAN ===
+
+
+      02:29:31.875262 IP 10.0.1.10.43560 > 203.0.113.10.6881: Flags [S], seq 652072878, win 64240, options [mss 1460,sackOK,TS val 2611942168 ecr 0,nop,wscale 10], length 0
+      02:29:31.875736 IP 203.0.113.10.6881 > 10.0.1.10.43560: Flags [S.], seq 286704879, ack 652072879, win 65160, options [mss 1460,sackOK,TS val 1454349702 ecr 2611942168,nop,wscale 10], length 0
+      02:29:31.875981 IP 10.0.1.10.43560 > 203.0.113.10.6881: Flags [.], ack 1, win 63, options [nop,nop,TS val 2611942169 ecr 1454349702], length 0
+      02:29:31.876109 IP 10.0.1.10.43560 > 203.0.113.10.6881: Flags [F.], seq 1, ack 1, win 63, options [nop,nop,TS val 2611942169 ecr 1454349702], length 0
+
+=== L4.3 APLICAR a politica anti-P2P ===
+      [fw] L4 ON  -> P2P bloqueado: TCP 6881:6889,51413 | UDP 6881:6889,6969,51413
+           Repare que a MESMA aplicacao na porta 80 passaria sem problema.
+      Chain LAB_L4 (1 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 NFLOG      6    --  *      *       0.0.0.0/0            0.0.0.0/0            multiport dports 6881:6889,51413 nflog-prefix "[FW] DROP P2P tcp " nflog-group 1
+      2        0     0 DROP       6    --  *      *       0.0.0.0/0            0.0.0.0/0            multiport dports 6881:6889,51413 /* L4: BitTorrent TCP bloqueado */
+      3        0     0 NFLOG      17   --  *      *       0.0.0.0/0            0.0.0.0/0            multiport dports 6881:6889,6969,51413 nflog-prefix "[FW] DROP P2P udp " nflog-group 1
+      4        0     0 DROP       17   --  *      *       0.0.0.0/0            0.0.0.0/0            multiport dports 6881:6889,6969,51413 /* L4: BitTorrent UDP/DHT/tracker bloqueado */
+
+=== L4.4 DEPOIS ===
+  [BLOQUEADO] pc1 -> TCP 6881
+  [BLOQUEADO] pc1 -> TCP 51413 (Transmission)
+  [BLOQUEADO] pc1 -> UDP 6969 (tracker)
+  [PERMITIDO] pc1 -> TCP 80 (navegacao normal seguiu funcionando)
+
+=== L4.5 A LIMITACAO DO CONTROLE POR PORTA ===
+     O mesmo 'peer' tambem responde na porta 80. Se a aplicacao P2P
+     mudar para uma porta permitida, a regra de L4 nao a alcanca:
+  [PERMITIDO] mesmo servidor P2P alcancado na porta 80
+     -> clientes BitTorrent usam portas dinamicas, UPnP e ate 443;
+        identificar a APLICACAO (nao a porta) exige inspecao de L7 / DPI.
+
+-----------------------------------------------
+ Resultado: 7 conforme o esperado, 0 divergente(s)
+-----------------------------------------------

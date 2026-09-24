@@ -1,0 +1,60 @@
+Aplicando a politica de perimetro no fw...
+[fw] POLITICA DE PERIMETRO aplicada (default deny + stateful).
+[fw] contadores zerados.
+
+=== 2.1 O que a politica PERMITE ===
+  [PERMITIDO] LAN -> Internet (HTTP)
+  [PERMITIDO] LAN -> web da DMZ (HTTP)
+  [PERMITIDO] LAN -> web da DMZ (HTTPS)
+  [PERMITIDO] LAN -> dns da DMZ (UDP 53)
+  [PERMITIDO] Internet -> web da DMZ (servico publicado)
+  [PERMITIDO] MGMT -> qualquer rede (adm -> web)
+
+=== 2.2 O que a politica BLOQUEIA ===
+  [BLOQUEADO] Internet -> LAN (ping em pc1)
+  [BLOQUEADO] Internet -> LAN (TCP em pc1)
+  [BLOQUEADO] DMZ -> LAN (web inicia conexao p/ pc1)
+  [BLOQUEADO] DMZ -> LAN (TCP novo do web p/ pc1)
+  [BLOQUEADO] LAN -> DMZ em porta nao publicada (22)
+  [BLOQUEADO] DMZ -> Internet fora do permitido (web navegando)
+
+=== 2.3 Filtragem STATEFUL (respostas de conexoes permitidas) ===
+     A resposta do servidor externo volta porque o conntrack a associa
+     a uma conexao que a LAN iniciou - nao existe regra 'Internet -> LAN' aberta.
+  [PERMITIDO] resposta HTTP da Internet chega em pc1
+     Conexoes no conntrack do fw:
+      ipv4     2 tcp      6 91 TIME_WAIT src=10.0.1.10 dst=10.0.2.10 sport=35500 dport=80 src=10.0.2.10 dst=10.0.1.10 sport=80 dport=35500 [ASSURED] mark=0 zone=0 use=2
+      ipv4     2 tcp      6 90 TIME_WAIT src=10.0.1.10 dst=203.0.113.1 sport=57508 dport=80 src=203.0.113.1 dst=10.0.1.10 sport=80 dport=57508 [ASSURED] mark=0 zone=0 use=2
+      ipv4     2 udp      17 2 src=10.0.1.10 dst=10.0.2.11 sport=47658 dport=53 src=10.0.2.11 dst=10.0.1.10 sport=53 dport=47658 mark=0 zone=0 use=2
+      ipv4     2 tcp      6 93 TIME_WAIT src=203.0.113.1 dst=10.0.2.10 sport=44974 dport=80 src=10.0.2.10 dst=203.0.113.1 sport=80 dport=44974 [ASSURED] mark=0 zone=0 use=2
+      ipv4     2 tcp      6 94 TIME_WAIT src=10.0.3.10 dst=10.0.2.10 sport=35216 dport=80 src=10.0.2.10 dst=10.0.3.10 sport=80 dport=35216 [ASSURED] mark=0 zone=0 use=2
+
+=== 2.4 Evidencia: contadores e logs de DROP ===
+      Chain FORWARD (policy DROP 7 packets, 420 bytes)
+      4        0     0 DROP       0    --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate INVALID
+      5       64  9279 ACCEPT     0    --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED /* respostas de conexoes permitidas */
+      6        2   120 ACCEPT     0    --  eth1   eth0    10.0.1.0/24          0.0.0.0/0            ctstate NEW /* LAN -> Internet */
+      7        2   120 ACCEPT     6    --  eth1   eth2    10.0.1.0/24          10.0.2.10            multiport dports 80,443 ctstate NEW /* LAN -> web DMZ (HTTP/HTTPS) */
+      8        1    82 ACCEPT     17   --  eth1   eth2    10.0.1.0/24          10.0.2.11            udp dpt:53 ctstate NEW /* LAN -> dns DMZ (UDP) */
+      9        0     0 ACCEPT     6    --  eth1   eth2    10.0.1.0/24          10.0.2.11            tcp dpt:53 ctstate NEW /* LAN -> dns DMZ (TCP) */
+      10       0     0 ACCEPT     1    --  eth1   eth2    10.0.1.0/24          0.0.0.0/0            icmptype 8 /* LAN -> DMZ (ping de diagnostico) */
+      11       1    60 ACCEPT     6    --  eth0   eth2    0.0.0.0/0            10.0.2.10            multiport dports 80,443 ctstate NEW /* Internet -> web DMZ (servico publicado) */
+      12       0     0 ACCEPT     17   --  eth2   eth0    10.0.2.11            0.0.0.0/0            udp dpt:53 /* dns DMZ -> Internet (resolucao externa) */
+      13       0     0 ACCEPT     6    --  eth2   eth0    10.0.2.11            0.0.0.0/0            tcp dpt:53 /* dns DMZ -> Internet (resolucao externa) */
+      14       1    60 ACCEPT     0    --  eth3   *       10.0.3.0/24          0.0.0.0/0            /* MGMT -> todas as redes */
+      15       5   348 NFLOG      0    --  eth0   eth1    0.0.0.0/0            0.0.0.0/0            nflog-prefix "[FW] DROP WAN->LAN " nflog-group 1
+      16       5   348 DROP       0    --  eth0   eth1    0.0.0.0/0            0.0.0.0/0            /* Internet -> LAN BLOQUEADO */
+      17       5   348 NFLOG      0    --  eth2   eth1    0.0.0.0/0            0.0.0.0/0            ctstate NEW nflog-prefix "[FW] DROP DMZ->LAN " nflog-group 1
+      18       5   348 DROP       0    --  eth2   eth1    0.0.0.0/0            0.0.0.0/0            ctstate NEW /* DMZ -> LAN (novas conexoes) BLOQUEADO */
+      19       7   420 NFLOG      0    --  *      *       0.0.0.0/0            0.0.0.0/0            nflog-prefix "[FW] DROP default " nflog-group 1
+     Logs:
+      18       5   348 DROP       0    --  eth2   eth1    0.0.0.0/0            0.0.0.0/0            ctstate NEW /* DMZ -> LAN (novas conexoes) BLOQUEADO */
+      19       7   420 NFLOG      0    --  *      *       0.0.0.0/0            0.0.0.0/0            nflog-prefix "[FW] DROP default " nflog-group 1
+      Chain OUTPUT (policy ACCEPT 0 packets, 0 bytes)
+      Chain LAB_L2 (2 references)
+      Chain LAB_L3 (1 references)
+      Chain LAB_L4 (1 references)
+
+-----------------------------------------------
+ Resultado: 13 conforme o esperado, 0 divergente(s)
+-----------------------------------------------

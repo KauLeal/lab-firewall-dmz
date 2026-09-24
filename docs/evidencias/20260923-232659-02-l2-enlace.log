@@ -1,0 +1,58 @@
+
+=== L2.1 ANTES da regra - pc1 e pc2 se comportam igual ===
+  [PERMITIDO] pc1 -> gateway
+  [PERMITIDO] pc2 -> gateway
+  [PERMITIDO] pc2 -> Internet
+  [PERMITIDO] pc2 -> web da DMZ
+
+=== L2.2 OBSERVAR - o firewall enxerga o MAC de origem dos quadros da LAN ===
+     MACs configurados:
+      pc1 -> 00:00:00:00:01:10
+      pc2 -> 00:00:00:00:01:11
+     tcpdump em fw:eth1 (LAN) enquanto pc2 faz ping:
+
+
+      02:28:08.311411 00:00:00:00:01:11 > 02:69:18:5b:1d:8a, ethertype IPv4 (0x0800), length 98: 10.0.1.11 > 10.0.2.10: ICMP echo request, id 29474, seq 1, length 64
+      02:28:08.311822 02:69:18:5b:1d:8a > 00:00:00:00:01:11, ethertype IPv4 (0x0800), length 98: 10.0.2.10 > 10.0.1.11: ICMP echo reply, id 29474, seq 1, length 64
+      02:28:09.339208 00:00:00:00:01:11 > 02:69:18:5b:1d:8a, ethertype IPv4 (0x0800), length 98: 10.0.1.11 > 10.0.2.10: ICMP echo request, id 29474, seq 2, length 64
+      02:28:09.339647 02:69:18:5b:1d:8a > 00:00:00:00:01:11, ethertype IPv4 (0x0800), length 98: 10.0.2.10 > 10.0.1.11: ICMP echo reply, id 29474, seq 2, length 64
+
+=== L2.3 APLICAR a regra (pc2 tratado como host comprometido) ===
+      [fw] L2 ON  -> todo quadro com MAC de origem 00:00:00:00:01:11 (pc2) e descartado.
+      Chain LAB_L2 (2 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+      1        0     0 NFLOG      0    --  eth1   *       0.0.0.0/0            0.0.0.0/0            MAC 00:00:00:00:01:11 nflog-prefix "[FW] DROP L2 MAC pc2 " nflog-group 1
+      2        0     0 DROP       0    --  eth1   *       0.0.0.0/0            0.0.0.0/0            MAC 00:00:00:00:01:11 /* L2: pc2 (00:00:00:00:01:11) comprometido - quarentena */
+
+=== L2.4 DEPOIS da regra ===
+  [PERMITIDO] pc1 -> gateway (nao afetado)
+  [PERMITIDO] pc1 -> Internet (nao afetado)
+  [BLOQUEADO] pc2 -> gateway
+  [BLOQUEADO] pc2 -> Internet
+  [BLOQUEADO] pc2 -> web da DMZ (HTTP)
+  [BLOQUEADO] pc2 -> DNS da DMZ
+     Contadores da chain LAB_L2 (hits da regra de MAC):
+      Chain LAB_L2 (2 references)
+       pkts bytes target     prot opt in     out     source               destination         
+          9   658 NFLOG      0    --  eth1   *       0.0.0.0/0            0.0.0.0/0            MAC 00:00:00:00:01:11 nflog-prefix "[FW] DROP L2 MAC pc2 " nflog-group 1
+          9   658 DROP       0    --  eth1   *       0.0.0.0/0            0.0.0.0/0            MAC 00:00:00:00:01:11 /* L2: pc2 (00:00:00:00:01:11) comprometido - quarentena */
+     Observacao importante: pc2 nao fica sem endereco IP nem sem link;
+     ele continua enviando quadros, mas o firewall os descarta na entrada.
+
+=== L2.5 Trocar o MAC contorna o controle? ===
+     Simulando MAC spoofing em pc2...
+
+  [PERMITIDO] pc2 com MAC falsificado volta a passar pelo firewall
+     -> Controle por MAC e util para quarentena local, mas nao resiste a spoofing.
+     Restaurando o MAC original de pc2...
+
+
+=== L2.6 Removendo a regra ===
+      [fw] L2 OFF -> pc2 liberado.
+      Chain LAB_L2 (2 references)
+      num   pkts bytes target     prot opt in     out     source               destination         
+  [PERMITIDO] pc2 volta a alcancar o gateway
+
+-----------------------------------------------
+ Resultado: 12 conforme o esperado, 0 divergente(s)
+-----------------------------------------------
