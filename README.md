@@ -160,16 +160,6 @@ servidor `dns` fala com a Internet, e só na porta 53. O servidor `web` não
 navega — o que reduz bastante o que um invasor consegue fazer depois de
 comprometê-lo (download de ferramentas, canal de C2 em HTTP, exfiltração).
 
-## Gravando o vídeo da entrega
-
-`./demo.sh` conduz a demonstração inteira na ordem do roteiro (capítulos,
-comando exibido antes de cada execução, ~5 min): é só gravar a tela e narrar.
-
-```bash
-./demo.sh          # pausa a cada capítulo (ENTER segue) — bom para narrar
-./demo.sh auto     # ritmo automático, sem pausas
-```
-
 ## Resultado da validação
 
 Laboratório executado de ponta a ponta (Kathará 3.8.3 + Docker, imagem
@@ -185,12 +175,20 @@ Laboratório executado de ponta a ponta (Kathará 3.8.3 + Docker, imagem
 | 4 — Defense in Depth | 12 | 0 |
 | **Total** | **67** | **0** |
 
-Saídas completas em `docs/evidencias/` e analisadas em
-[`docs/RELATORIO.md`](docs/RELATORIO.md).
+## Controle em L7 — proposta
 
-## Entrega
+Como controle adicional na camada de aplicação, propõe-se implementar
+filtragem DNS para impedir resolução de domínios classificados como
+maliciosos ou inadequados. O DNS da DMZ pode aplicar listas de bloqueio
+e registrar consultas, permitindo identificar tentativas de acesso a
+domínios proibidos.
 
-- Topologia: este diretório (`lab.conf` + `*.startup` + diretórios dos nós).
-  `./pack.sh` gera o pacote `firewall-dmz-lab.tar.gz` para upload.
-- Regras e testes comentados: este README + [`docs/RELATORIO.md`](docs/RELATORIO.md).
-- Evidências: `docs/evidencias/*.log` (geradas por `tests/run-all.sh`).
+Como segunda camada de proteção para o servidor Web, pode ser utilizado
+um reverse proxy com WAF. O proxy receberia as requisições HTTP/HTTPS
+antes do servidor Web e poderia bloquear padrões de ataque de aplicação,
+como tentativas de exploração de SQL injection, XSS e requisições
+malformadas.
+
+Esses controles complementam o firewall: enquanto L3/L4 controlam
+endereços, protocolos e portas, o controle L7 permite analisar o
+conteúdo e o contexto da comunicação.
